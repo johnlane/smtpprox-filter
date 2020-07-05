@@ -1,7 +1,7 @@
-smtpprox
-========
+smtpprox-filter
+===============
 
-trivial transparent SMTP proxy
+trivial transparent SMTP proxy content filter
 
 About smtpprox
 --------------
@@ -15,16 +15,27 @@ hooking in envelope and content controls and scanning.
 For efficiency reasons, it pre-forks and serves from a pool of
 servers, Apache-style.
 
+smtpprox-filter adds a content filtering mechanism where the DATA
+part of the SMTP conversation is passed through a filter pipeline,
+the filters being provided as command-line arguments.
+
+Any executables that read stdin and writes stdout can be used as
+a filter.
+
+smtpprox-filter adds a --helo option to specify the fqdn sent to
+connecting clients and in HELO/EHLO responses sent as a client.
+
 Author
 ------
 
-smtpprox was written by Bennett Todd, <bet@rahul.net>.
+smtpprox was written by Bennett Todd, <bet@rahul.net>. The extensions
+forming smtpprox-filter were contributed by John Lane, <john@lane.uk.net>.
 
 About this repository
 ---------------------
 
-This github repository was setup to track smtpprox source and patches
-needed to build a debian package.
+This github repository is a fork of jnorell/smtpprox extended to
+provide the content filter functionality.
 
 smtpprox Copyright
 ------------------
