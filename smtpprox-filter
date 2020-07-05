@@ -20,6 +20,7 @@ use IO::File;
 use lib '.';
 use MSDW::SMTP::Server;
 use MSDW::SMTP::Client;
+use IPC::Run qw(run);
 
 =head1 NAME
 
@@ -109,9 +110,9 @@ GetOptions("children=n" => \$children,
 	   "helo=s" => \$helo,
 	   "debugtrace=s" => \$debugtrace) or die $syntax;
 
-die $syntax unless @ARGV == 2;
-my ($srcaddr, $srcport) = split /:/, $ARGV[0];
-my ($dstaddr, $dstport) = split /:/, $ARGV[1];
+die $syntax unless @ARGV >= 2;
+my ($srcaddr, $srcport) = split /:/, shift;
+my ($dstaddr, $dstport) = split /:/, shift;
 die $syntax unless defined($srcport) and defined($dstport);
 
 my $server = MSDW::SMTP::Server->new(interface => $srcaddr, port => $srcport);
@@ -170,7 +171,21 @@ while (1) {
             $server->ok($reply);
             next;
 	} elsif ($what eq '.') {
-	    $client->yammer($server->{data});
+
+            if ($#ARGV >= 0) {
+                my $data = IO::File->new_tmpfile;
+                my @args = ( [ split / /, shift ], "<", $server->{data});
+                while ($#ARGV >= 0) {
+                  push @args, "|", [ split / /, shift ];
+                }
+                push @args, ">", $data;
+                run @args or die "command failed ($?)";
+                $data->seek(0,0);
+                $server->{data} = $data;
+            }
+
+            $client->yammer($server->{data});
+
 	} else {
 	    $client->say($what);
 	}
