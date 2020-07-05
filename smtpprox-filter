@@ -11,6 +11,8 @@
 #   GNU General Public License for more details.
 #
 # Written by Bennett Todd <bet@rahul.net>
+#
+# smtpprox-filter extension by John Lane <john@lane.uk.net>
 
 use strict;
 use Getopt::Long;
@@ -31,6 +33,7 @@ use MSDW::SMTP::Client;
       --minperchild=100
       --maxperchild=200
       --debugtrace=filename_prefix
+      --helo=helo
 
 =head1 DESCRIPTION
 
@@ -55,6 +58,11 @@ snooper on the client side of the proxy. And if debugtracefile is
 defined, it returns its own banner including its PID for debugging
 at startup, otherwise it copies the server's banner back to the
 client transparently.
+
+if --helo fqdn argument is given then the fqdn is used in the
+server announcement when a client connects and in the client helo
+when connecting to the destination server. If --helo is not given
+then the client's helo is passed through to the destination.
 
 =head1 EXAMPLE
 
@@ -93,10 +101,12 @@ my $syntax = "syntax: $0 [--children=16] [--minperchild=100] ".
 my $children = 16;
 my $minperchild = 100;
 my $maxperchild = 200;
+my $helo = undef;
 my $debugtrace = undef;
 GetOptions("children=n" => \$children,
 	   "minperchild=n" => \$minperchild,
 	   "maxperchild=n" => \$maxperchild,
+	   "helo=s" => \$helo,
 	   "debugtrace=s" => \$debugtrace) or die $syntax;
 
 die $syntax unless @ARGV == 2;
@@ -146,10 +156,20 @@ while (1) {
     $server->accept(%opts);
     my $client = MSDW::SMTP::Client->new(interface => $dstaddr, port => $dstport);
     my $banner = $client->hear;
-    $banner = "220 $debugtrace.$$" if defined $debugtrace;
+    $banner = "220 $helo ESMTP filter proxy" if defined $helo;
+    $banner = "$banner $debugtrace.$$" if defined $debugtrace;
     $server->ok($banner);
     while (my $what = $server->chat) {
-	if ($what eq '.') {
+	if ( defined($helo) and ( $what =~ m/^(HE|EH)LO\s/ ) ) {
+            my ($verb, $data) = split / /, $what;
+            $what = "$verb $helo";
+            $client->say($what);
+
+            my $reply=$client->hear;
+            $reply =~ s/250-.*/250-$helo/;
+            $server->ok($reply);
+            next;
+	} elsif ($what eq '.') {
 	    $client->yammer($server->{data});
 	} else {
 	    $client->say($what);
